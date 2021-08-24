@@ -115,7 +115,7 @@ Though this test is aimed at the `IPQ8065` platform, the DTS hardware file modif
 
 **Update 2021-8-24:** At `1.4ghz` (`1.4` GHz), the crash may still happen, just less often.  In one case, instead of rebooting after around 5 minutes to 2 hours (as with `1.75` GHz), it rebooted at 9 hours 19 minutes.  Any mitigation efforts will probably need to account for the `1.4` GHz speed as well.
 
-Initial results suggest focusing on CPU frequency transitions that impact the L2 cache speed (`1.0` → `1.4` → `1.75` GHz).
+Initial results suggest focusing on CPU frequency transitions that are near the L2 cache speed shift (`1.0` and `1.4` → `1.75` GHz).
 
 ### Test modes
 
