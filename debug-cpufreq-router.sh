@@ -5,6 +5,7 @@ set -euo pipefail
 CPUFREQ_POLICY_PATH="/sys/devices/system/cpu/cpufreq/policyCPUINDEX"
 CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK="$(cat ${CPUFREQ_POLICY_PATH/CPUINDEX/0}/cpuinfo_max_freq)"
 CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK="1400000"
+CPUFREQ_IPQ8065_1GHZ_MAX_CLOCK="1000000"
 
 CPUFREQ_DEFAULT_GOVERNOR="ondemand"
 CPUFREQ_FORCED_GOVERNOR="performance"
@@ -158,7 +159,7 @@ cpu_get_valid_freq ()
 {
 	local EXPECTED_ARGS=2
 	if [ $# -ne $EXPECTED_ARGS ]; then
-		echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1}" >&2
+		echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1, case2}" >&2
 		return 1
 	fi
 
@@ -190,8 +191,19 @@ cpu_get_valid_freq ()
 				echo "800000"
 			fi
 			;;
+		"case2" )
+			# Toggle between lowest allowed (600 MHz, see /etc/init.d/cpufreq) and highest
+			# This offers the maximum possible jump, especially when disabling 1.4 GHz and 1.75 GHz
+			local CURRENT_FREQ="$(cpu_get_max_allowed_clock $CPU_INDEX current)" || return $?
+			if [[ "$CURRENT_FREQ" == "600000" ]]; then
+				# Print out prior (before test) maximum allowed clock
+				cpu_get_max_allowed_clock $CPU_INDEX prior || return $?
+			else
+				echo "600000"
+			fi
+			;;
 		* )
-			echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1}" >&2
+			echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1, case2}" >&2
 			return 1
 			;;
 	esac
@@ -199,7 +211,7 @@ cpu_get_valid_freq ()
 
 print_usage_test_cycle_freqs ()
 {
-	echo "Usage: `basename $0` test_cycle_freqs {CPU index, cycling one while keeping other at max, or 'random', 'all'} {frequency mode: random, case1}" >&2
+	echo "Usage: `basename $0` test_cycle_freqs {CPU index, cycling one while keeping other at max, or 'random', 'all'} {frequency mode: random, case1, case2}" >&2
 }
 
 cpu_test_cycle_freqs ()
@@ -323,8 +335,9 @@ cleanup_test ()
 
 print_usage ()
 {
-	echo "Usage: `basename $0` {default, 1.4ghz, test_cycle_freqs}" >&2
+	echo "Usage: `basename $0` {default, 1.4ghz, 1ghz, test_cycle_freqs}" >&2
 	echo "Recommended settings - first set to 'default' or '1.4ghz' frequency, then run 'test_cycle_freqs random case1'" >&2
+	echo "Alternatively, first set to '1ghz' frequency, then run 'test_cycle_freqs random case2'" >&2
 }
 
 EXPECTED_ARGS=1
@@ -350,6 +363,13 @@ case "$1" in
 		echo "Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK KHz"
 		cpu_set_governor "all" "$CPUFREQ_DEFAULT_GOVERNOR" || return $?
 		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK" || return $?
+		# Make sure OpenWRT startup customization is applied as well
+		/etc/init.d/cpufreq restart || return $?
+		;;
+	"1ghz" )
+		echo "Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_1GHZ_MAX_CLOCK KHz"
+		cpu_set_governor "all" "$CPUFREQ_DEFAULT_GOVERNOR" || return $?
+		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_1GHZ_MAX_CLOCK" || return $?
 		# Make sure OpenWRT startup customization is applied as well
 		/etc/init.d/cpufreq restart || return $?
 		;;

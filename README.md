@@ -59,6 +59,13 @@ You can continue to use the router like normal during the test, just be prepared
 
 **Update 2021-8-24:** The crash may still happen, just less often.  [See CPU Frequencies below for more details](README.md#cpu-frequencies ).
 
+#### Verify limiting CPU to 1 GHz stops crash
+```
+./debug-cpufreq-ssh-loop.sh "1ghz" "case2" "openwrt"
+```
+
+*Connects as user `root` on SSH port `22` to the OpenWRT router at hostname `openwrt`, then runs the QA test with `1ghz` max CPU frequency (`1.0` GHz) while emulating the second set of crash conditions, `case2`.*
+
 ## Usage on router directly
 
 ### Download to router
@@ -97,9 +104,12 @@ CPU frequency mode | Outcome
 -------------------|---------
 `default`          | Sets max CPU frequency to `1.75` GHz (default)
 `1.4ghz`           | Sets max CPU frequency to `1.4` GHz (temporary workaround for issue)
+`1ghz`             | Sets max CPU frequency to `1.0` GHz (`IPQ8064` limit for `1.0` GHz L2 cache)
 `unchanged`        | No change, uses current per-CPU `[…]/policy*/scaling_max_freq` as upper limit
 
 All options other than `unchanged` adjusts `scaling_max_freq` for all CPUs, e.g. `/sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq`.
+
+Though this test is aimed at the `IPQ8065` platform, the DTS hardware file modifies the `IPQ8064` base definition (with a `1.4` GHz max CPU clock), hence trying `1ghz` as a CPU frequency selection.
 
 **NOTE:** Setting a CPU frequency ceiling of `1.4` GHz is only a temporary workaround to use the router for workloads that cause crashes.  It is not a permanent solution due to reducing performance.
 
@@ -113,6 +123,7 @@ Test mode | Outcome
 ----------|---------
 `random`  | Randomizes CPU frequency from `600000 800000 1000000 1400000 1725000` limited by `scaling_max_freq`
 `case1`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `800` MHz
+`case2`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `600` MHz (greater jump)
 
 ### Advanced: CPU index
 
