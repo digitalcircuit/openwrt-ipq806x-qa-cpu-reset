@@ -4,7 +4,7 @@ set -euo pipefail
 
 CPUFREQ_POLICY_PATH="/sys/devices/system/cpu/cpufreq/policyCPUINDEX"
 CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK="$(cat ${CPUFREQ_POLICY_PATH/CPUINDEX/0}/cpuinfo_max_freq)"
-CPUFREQ_IPQ8065_STABLE_MAX_CLOCK="1400000"
+CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK="1400000"
 
 CPUFREQ_DEFAULT_GOVERNOR="ondemand"
 CPUFREQ_FORCED_GOVERNOR="performance"
@@ -323,8 +323,8 @@ cleanup_test ()
 
 print_usage ()
 {
-	echo "Usage: `basename $0` {default, stable, test_cycle_freqs}" >&2
-	echo "Recommended settings - first set to 'default' or 'stable' frequency, then run 'test_cycle_freqs random case1'" >&2
+	echo "Usage: `basename $0` {default, 1.4ghz, test_cycle_freqs}" >&2
+	echo "Recommended settings - first set to 'default' or '1.4ghz' frequency, then run 'test_cycle_freqs random case1'" >&2
 }
 
 EXPECTED_ARGS=1
@@ -346,10 +346,10 @@ case "$1" in
 		# Make sure OpenWRT startup customization is applied as well
 		/etc/init.d/cpufreq restart || return $?
 		;;
-	"stable" )
-		echo "Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_STABLE_MAX_CLOCK KHz"
+	"1.4ghz" )
+		echo "Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK KHz"
 		cpu_set_governor "all" "$CPUFREQ_DEFAULT_GOVERNOR" || return $?
-		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_STABLE_MAX_CLOCK" || return $?
+		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK" || return $?
 		# Make sure OpenWRT startup customization is applied as well
 		/etc/init.d/cpufreq restart || return $?
 		;;

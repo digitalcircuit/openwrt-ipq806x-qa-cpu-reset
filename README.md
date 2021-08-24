@@ -50,12 +50,14 @@ You can continue to use the router like normal during the test, just be prepared
 
 **NOTE:** It may take 8+ hours to trigger the crash!
 
-#### Verify temporary workaround stops crash
+#### Verify temporary workaround crashes less often
 ```
-./debug-cpufreq-ssh-loop.sh "stable" "case1" "openwrt"
+./debug-cpufreq-ssh-loop.sh "1.4ghz" "case1" "openwrt"
 ```
 
-*Connects as user `root` on SSH port `22` to the OpenWRT router at hostname `openwrt`, then runs the QA test with `stable` max CPU frequency (`1.4` GHz) while emulating the first set of crash conditions, `case1`.*
+*Connects as user `root` on SSH port `22` to the OpenWRT router at hostname `openwrt`, then runs the QA test with `1.4ghz` max CPU frequency (`1.4` GHz) while emulating the first set of crash conditions, `case1`.*
+
+**Update 2021-8-24:** The crash may still happen, just less often.  [See CPU Frequencies below for more details](README.md#cpu-frequencies ).
 
 ## Usage on router directly
 
@@ -94,12 +96,16 @@ chmod u+x debug-cpufreq-router.sh
 CPU frequency mode | Outcome
 -------------------|---------
 `default`          | Sets max CPU frequency to `1.75` GHz (default)
-`stable`           | Sets max CPU frequency to `1.4` GHz (temporary workaround for issue)
+`1.4ghz`           | Sets max CPU frequency to `1.4` GHz (temporary workaround for issue)
 `unchanged`        | No change, uses current per-CPU `[…]/policy*/scaling_max_freq` as upper limit
+
+All options other than `unchanged` adjusts `scaling_max_freq` for all CPUs, e.g. `/sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq`.
 
 **NOTE:** Setting a CPU frequency ceiling of `1.4` GHz is only a temporary workaround to use the router for workloads that cause crashes.  It is not a permanent solution due to reducing performance.
 
-All options other than `unchanged` adjusts `scaling_max_freq` for all CPUs, e.g. `/sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq`.
+**Update 2021-8-24:** At `1.4ghz` (`1.4` GHz), the crash may still happen, just less often.  In one case, instead of rebooting after around 5 minutes to 2 hours (as with `1.75` GHz), it rebooted at 9 hours 19 minutes.  Any mitigation efforts will probably need to account for the `1.4` GHz speed as well.
+
+Initial results suggest focusing on CPU frequency transitions that impact the L2 cache speed (`1.0` → `1.4` → `1.75` GHz).
 
 ### Test modes
 
@@ -166,6 +172,12 @@ Semi-reliable, "real" reproducer for this issue:
 Not sure yet!
 
 Ansuel had [some initial suggestions on GitHub over here](https://github.com/openwrt/openwrt/pull/4464#issuecomment-903178662 ).
+
+Result | Mitigation | Outcome
+-------|------------|--------
+?     | Add transition frequencies (e.g. `1.75` → `1.4` → `1.0` GHz) | *Not yet tested*
+?     | Force both cores to same frequency (always, or at `1.4` & `1.75` GHz) | *Not yet tested*
+?     | Increase clock latency (all, or just `1.4` & `1.75` GHz) | *Not yet tested*
 
 ## Links
 

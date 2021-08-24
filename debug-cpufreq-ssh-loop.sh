@@ -8,12 +8,12 @@ _LOCAL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 print_usage ()
 {
 	echo "Usage:" >&2
-	echo "  `basename $0` {CPU max frequency: default, stable, unchanged}" >&2
+	echo "  `basename $0` {CPU max frequency: default, 1.4ghz, unchanged}" >&2
 	echo "  {test mode: random, case1} {router hostname}" >&2
 	echo "  {optional: router SSH port, default=22} {optional: KDE Connect device name for notifications, default=disabled}" >&2
 	echo >&2
 	echo "Recommended settings:" >&2
-	echo "  Set frequency to 'default' or 'stable', set test mode to 'case1'" >&2
+	echo "  Set frequency to 'default' or '1.4ghz', set test mode to 'case1'" >&2
 	echo >&2
 	echo "NOTE:" >&2
 	echo "  It may take up to 8 hours or more for the crash to occur!" >&2
@@ -55,7 +55,7 @@ fi
 
 # Validate settings
 case "$START_FREQ_MODE" in
-	"default" | "stable" | "unchanged" )
+	"default" | "1.4ghz" | "unchanged" )
 		: # All good!
 		;;
 	* )
@@ -158,7 +158,7 @@ fi
 setup_test_freqs ()
 {
 	case "$START_FREQ_MODE" in
-		"default" | "stable")
+		"default" | "1.4ghz")
 			# Set system to known state
 			echo "$(date -R): Setting CPU max frequency..." | tee --append "$RUN_LOG"
 			ssh -p "$ROUTER_PORT" "root@$ROUTER_HOST" "/tmp/$RUN_SCRIPT" "$START_FREQ_MODE" 2>&1 | tee --append "$RUN_LOG"
