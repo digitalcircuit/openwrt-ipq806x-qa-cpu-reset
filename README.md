@@ -3,7 +3,7 @@ OpenWRT IPQ806x QA for CPU reset
 
 These shell scripts for OpenWRT assist with diagnosing unexpected CPU resets/reboots on the Qualcomm™ IPQ806x platform.
 
-In particular, they have been used to recreate a crash on [the ZyXEL NBG6817 router](https://openwrt.org/toh/zyxel/nbg6817 ) featuring the IPQ8065 network processor.  [More details on the real-world workload below](README.md#what_real_workload_causes_this_).
+In particular, they have been used to recreate a crash on [the ZyXEL NBG6817 router](https://openwrt.org/toh/zyxel/nbg6817 ) featuring the IPQ8065 network processor.  [More details on the real-world workload below](README.md#what-real-workload-causes-this).
 
 ## Usage via computer helper
 
@@ -80,7 +80,7 @@ chmod u+x debug-cpufreq-router.sh
 
 ### Prepare for router hard reboot (again)
 
-[See above for warnings](README.md#prepare_for_router_hard_reboot); in brief, the router will likely **hard reboot without warning, as if unplugged from power supply.**
+[See above for warnings](README.md#prepare-for-router-hard-reboot); in brief, the router will likely **hard reboot without warning, as if unplugged from power supply.**
 
 ### Run QA script on router
 
@@ -147,11 +147,36 @@ It doesn't seem to be an issue with the programs; instead, something about the C
 
 Semi-reliable, "real" reproducer for this issue:
 
-* Déjà Dup on a Linux computer
+* [Déjà Dup on a Linux computer](https://gitlab.gnome.org/World/deja-dup )
   * Set destination to SFTP on OpenWRT router
 * OpenWRT router has OpenSSH installed, bound to second port
   * OpenSSH used so it can be locked down via `chroot` to secondary user, SFTP only
-  * USB 3.0 HDD plugged into OpenWRT serving as Network Attached Storage
+  * 1 TB USB 3.0 HDD plugged into OpenWRT serving as Network Attached Storage
+
+Déjà Dup uses `duplicity` to back up to remote destinations (including SFTP) in 25 MB chunks, e.g. `duplicity-full.20210821T213219Z.vol1036.difftar.gpg (25.1 MiB)`, before finishing with a larger single package of signatures, e.g. `duplicity-full-signatures.20210821T213219Z.sigtar.gpg (1.6 GiB)`.  In between uploads, Déjà Dup compresses and encrypts the files locally.
+
+This results in a "bursty" workload involving 1-4 seconds of uploading to the router (local network to USB 3.0 HDD), then roughly 0.25-1.5 seconds of compressing & encrypting, during which no load is placed on the router.
+
+When watching the router's CPU frequency, it tends to jump between 800 MHz and 1.75 GHz, switching between CPUs - notably, this is primarily a **single CPU core workload**, so stress-testing by **loading both CPUs might not trigger the issue**, even in a cyclic (load, pause, repeat) fashion.
+
+A full Déjà Dup backup takes about 8 hours and stores around 200 GiB to the USB HDD.
+
+#### Printing CPU frequency to kernel log
+
+For more details, see [the Linux kernel documentation on dynamic debugging](https://www.kernel.org/doc/html/latest/admin-guide/dynamic-debug-howto.html ).
+
+*Enabling dynamic debugging to print CPU frequency changes, following logs*
+```
+echo "file drivers/regulator/* =p" > /sys/kernel/debug/dynamic_debug/control
+echo "file drivers/cpufreq/* =p" > /sys/kernel/debug/dynamic_debug/control
+logread -f
+```
+
+*Undoing the above, disabling dynamic debugging of CPU frequency changes*
+```
+echo "file drivers/regulator/* =_" > /sys/kernel/debug/dynamic_debug/control
+echo "file drivers/cpufreq/* =_" > /sys/kernel/debug/dynamic_debug/control
+```
 
 ### What alternatives for the real workload have been tried?
 
@@ -177,6 +202,9 @@ Semi-reliable, "real" reproducer for this issue:
   * `i=0 ; i_max=7200 ; while [ $i -lt $i_max ] ; do let i++; echo "[router] $(date -R): Iteration $i of $i_max" ; nice -n 5 stress-ng --oomable -t 3s --cache 1 --cache-level 2 || exit 1 ; sleep 1 ; done`
   * Above tests don't crash, other `stress-ng` tests result in near-instant crashes
   * Unable to determine if finding new bugs or recreating issue from real workload
+* Python 3 usage of GNOME GIO library to SFTP upload a 25 MiB chunk of `/dev/urandom`
+  * 25 MiB chunk has been created once, maybe needs to be unique each time?
+  * Not thoroughly tested, but does not seem to recreate crash
 
 ### How should this be fixed?
 
