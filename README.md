@@ -121,7 +121,7 @@ Initial results suggest focusing on CPU frequency transitions that are near the 
 
 Test mode | Outcome
 ----------|---------
-`random`  | Randomizes CPU frequency from `600000 800000 1000000 1400000 1725000` limited by `scaling_max_freq`
+`random`  | Randomizes CPU frequency between `scaling_min_freq` and `scaling_max_freq`
 `case1`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `800` MHz
 `case2`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `600` MHz (greater jump)
 

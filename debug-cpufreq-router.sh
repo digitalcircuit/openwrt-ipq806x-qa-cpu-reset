@@ -12,8 +12,8 @@ CPUFREQ_FORCED_GOVERNOR="performance"
 
 # From 'qcom-ipq8065.dtsi', divided by 1000 for Hz -> KHz (remove 3 zeroes)
 # Not sure how to get this at runtime
-# Remove "384000" as it has been disabled by /etc/init.d/cpufreq
-CPUFREQ_OPP_FREQS="600000 800000 1000000 1400000 1725000"
+# If "384000" is disabled by /etc/init.d/cpufreq, it will automatically be skipped
+CPUFREQ_OPP_FREQS="384000 600000 800000 1000000 1400000 1725000"
 CPUFREQ_OPP_FREQS_COUNT="$(echo $CPUFREQ_OPP_FREQS | wc -w)"
 
 CPU_PRIOR_MAX_CLOCK_0="<unknown>"
@@ -155,6 +155,33 @@ cpu_get_max_allowed_clock ()
 	fi
 }
 
+cpu_get_min_allowed_clock ()
+{
+	local EXPECTED_ARGS=1
+	if [ $# -ne $EXPECTED_ARGS ]; then
+		echo "Usage: `basename $0` [cpu_get_min_allowed_clock] {CPU index}" >&2
+		return 1
+	fi
+
+	local CPU_INDEX="$1"
+
+	if [[ "$CPU_INDEX" == "all" ]]; then
+		# Get min clock of all CPUs
+		local CPU_MIN_CLOCK_0="$(cpu_get_min_allowed_clock 0)" || return $?
+		local CPU_MIN_CLOCK_1="$(cpu_get_min_allowed_clock 1)" || return $?
+		# Make sure they're consistent
+		if [[ "$CPU_MIN_CLOCK_0" == "$CPU_MIN_CLOCK_1" ]]; then
+			echo "$CPU_MIN_CLOCK_0"
+		else
+			echo "`basename $0` [cpu_get_min_allowed_clock] Could not get min allowed clock speed for CPUs, mismatch (CPU 0=\"$CPU_MIN_CLOCK_0\", CPU 1=\"$CPU_MIN_CLOCK_1\")" >&2
+			return 1
+		fi
+	else
+		# Get min allowed clock of indicated CPU
+		cat "${CPUFREQ_POLICY_PATH/CPUINDEX/$CPU_INDEX}/scaling_min_freq" || return $?
+	fi
+}
+
 cpu_get_valid_freq ()
 {
 	local EXPECTED_ARGS=2
@@ -168,13 +195,17 @@ cpu_get_valid_freq ()
 
 	case "$FREQ_MODE" in
 		"random" )
-			# Pick a random frequency from the valid list, discarding picks that are too high
+			# Pick random frequency from list, discarding picks that are too high/too low
+			local MIN_FREQ="$(cpu_get_min_allowed_clock $CPU_INDEX)" || return $?
 			local MAX_FREQ="$(cpu_get_max_allowed_clock $CPU_INDEX prior)" || return $?
+			local CURRENT_FREQ="$(cpu_get_max_allowed_clock $CPU_INDEX current)" || return $?
 			# Set initial non-random value to out of range
 			local RAND_FREQ="$((MAX_FREQ + 1))"
-			while [ $RAND_FREQ -gt $MAX_FREQ ]; do
+			while [ $RAND_FREQ -gt $MAX_FREQ ] \
+				|| [ $RAND_FREQ -lt $MIN_FREQ ] \
+				|| [ $RAND_FREQ -eq $CURRENT_FREQ ]; do
 				local RAND_NUM="$(get_rand_number $CPUFREQ_OPP_FREQS_COUNT)"
-				local RAND_FREQ="$(echo $CPUFREQ_OPP_FREQS | cut -d ' ' -f $RAND_NUM)"
+				RAND_FREQ="$(echo $CPUFREQ_OPP_FREQS | cut -d ' ' -f $RAND_NUM)"
 			done
 			echo "$RAND_FREQ"
 			;;
