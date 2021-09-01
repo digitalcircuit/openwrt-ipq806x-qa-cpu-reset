@@ -124,6 +124,7 @@ Test mode | Outcome
 `random`  | Randomizes CPU frequency between `scaling_min_freq` and `scaling_max_freq`
 `case1`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `800` MHz
 `case2`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `600` MHz (greater jump)
+`ramp1`   | Smoothly ramps CPU frequency between `scaling_min_freq` and `scaling_max_freq`
 
 ### Advanced: CPU index
 

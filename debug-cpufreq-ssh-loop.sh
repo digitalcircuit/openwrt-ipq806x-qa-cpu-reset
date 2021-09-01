@@ -9,7 +9,7 @@ print_usage ()
 {
 	echo "Usage:" >&2
 	echo "  `basename $0` {CPU max frequency: default, 1.4ghz, 1ghz, unchanged}" >&2
-	echo "  {test mode: random, case1, case2} {router hostname}" >&2
+	echo "  {test mode: random, case1, case2, ramp1} {router hostname}" >&2
 	echo "  {optional: router SSH port, default=22} {optional: KDE Connect device name for notifications, default=disabled}" >&2
 	echo >&2
 	echo "Recommended settings:" >&2
@@ -67,7 +67,7 @@ case "$START_FREQ_MODE" in
 esac
 
 case "$TEST_MODE" in
-	"random" | "case1" | "case2" )
+	"random" | "case1" | "case2" | "ramp1" )
 		: # All good!
 		;;
 	* )
@@ -189,7 +189,7 @@ while true; do
 	# Don't exit on failure
 	set +e
 	case "$TEST_MODE" in
-		"random" | "case1" | "case2" )
+		"random" | "case1" | "case2" | "ramp1" )
 			# Use tty (-t) to allow sending signals
 			# Results in a successful exit on Ctrl-C
 			ssh -o "ServerAliveInterval 3" -t -p "$ROUTER_PORT" "root@$ROUTER_HOST" "/tmp/$RUN_SCRIPT" test_cycle_freqs random $TEST_MODE 2>&1 | tee --append "$RUN_LOG"

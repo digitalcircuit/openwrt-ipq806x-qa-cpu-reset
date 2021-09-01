@@ -20,6 +20,12 @@ CPU_PRIOR_MAX_CLOCK_0="<unknown>"
 CPU_PRIOR_MAX_CLOCK_1="<unknown>"
 CPU_TEST_FAILED=false
 
+#Global variables cannot be adjusted inside subshell
+#CPU_TEST_FREQS_INDEX_0=0
+#CPU_TEST_FREQS_INDEX_1=0
+CPU_TEST_FREQS_INDEX_0_FILE=""
+CPU_TEST_FREQS_INDEX_1_FILE=""
+
 log_datetime ()
 {
 	date "+%F %r"
@@ -182,11 +188,92 @@ cpu_get_min_allowed_clock ()
 	fi
 }
 
+cpu_test_freqs_set_index ()
+{
+	local EXPECTED_ARGS=2
+	if [ $# -ne $EXPECTED_ARGS ]; then
+		echo "Usage: `basename $0` [cpu_test_freqs_set_index] {CPU index, or 'all'} {frequency index}" >&2
+		return 1
+	fi
+
+	if [ ! -f "$CPU_TEST_FREQS_INDEX_0_FILE" ] || [ ! -f "$CPU_TEST_FREQS_INDEX_1_FILE" ]; then
+		echo "[cpu_test_freqs_set_index] Global variables CPU_TEST_FREQS_INDEX_0_FILE or CPU_TEST_FREQS_INDEX_1_FILE were not created!" >&2
+		return 1
+	fi
+
+	local CPU_INDEX="$1"
+	local CPU_FREQ_INDEX="$2"
+
+	# Set index of indicated CPU
+	case "$CPU_INDEX" in
+		"all" )
+			#CPU_TEST_FREQS_INDEX_0="$CPU_FREQ_INDEX"
+			#CPU_TEST_FREQS_INDEX_1="$CPU_FREQ_INDEX"
+			echo "$CPU_FREQ_INDEX" > "$CPU_TEST_FREQS_INDEX_0_FILE"
+			echo "$CPU_FREQ_INDEX" > "$CPU_TEST_FREQS_INDEX_1_FILE"
+			;;
+		"0" )
+			#CPU_TEST_FREQS_INDEX_0="$CPU_FREQ_INDEX"
+			echo "$CPU_FREQ_INDEX" > "$CPU_TEST_FREQS_INDEX_0_FILE"
+			;;
+		"1" )
+			#CPU_TEST_FREQS_INDEX_1="$CPU_FREQ_INDEX"
+			echo "$CPU_FREQ_INDEX" > "$CPU_TEST_FREQS_INDEX_1_FILE"
+			;;
+		* )
+			echo "`basename $0` [cpu_test_freqs_set_index] Unknown CPU index '$CPU_INDEX'" >&2
+			return 1
+			;;
+	esac
+}
+
+cpu_test_freqs_get_index ()
+{
+	local EXPECTED_ARGS=1
+	if [ $# -ne $EXPECTED_ARGS ]; then
+		echo "Usage: `basename $0` [cpu_test_freqs_get_index] {CPU index}" >&2
+		return 1
+	fi
+
+	if [ ! -f "$CPU_TEST_FREQS_INDEX_0_FILE" ] || [ ! -f "$CPU_TEST_FREQS_INDEX_1_FILE" ]; then
+		echo "[cpu_test_freqs_set_index] Global variables CPU_TEST_FREQS_INDEX_0_FILE or CPU_TEST_FREQS_INDEX_1_FILE were not created!" >&2
+		return 1
+	fi
+
+	local CPU_INDEX="$1"
+
+	# Get index of indicated CPU
+	case "$CPU_INDEX" in
+		"all" )
+			# Make sure they're consistent
+			if [[ "$CPU_TEST_FREQS_INDEX_0" == "$CPU_TEST_FREQS_INDEX_1" ]]; then
+				#echo "$CPU_TEST_FREQS_INDEX_0"
+				cat "$CPU_TEST_FREQS_INDEX_0_FILE"
+			else
+				echo "`basename $0` [cpu_test_freqs_get_index] Could not get CPU test index for CPUs, mismatch (CPU 0=\"$CPU_TEST_FREQS_INDEX_0\", CPU 1=\"$CPU_TEST_FREQS_INDEX_1\")" >&2
+				return 1
+			fi
+			;;
+		"0" )
+			#echo "$CPU_TEST_FREQS_INDEX_0"
+			cat "$CPU_TEST_FREQS_INDEX_0_FILE"
+			;;
+		"1" )
+			#echo "$CPU_TEST_FREQS_INDEX_1"
+			cat "$CPU_TEST_FREQS_INDEX_1_FILE"
+			;;
+		* )
+			echo "`basename $0` [cpu_test_freqs_get_index] Unknown CPU index '$CPU_INDEX'" >&2
+			return 1
+			;;
+	esac
+}
+
 cpu_get_valid_freq ()
 {
 	local EXPECTED_ARGS=2
 	if [ $# -ne $EXPECTED_ARGS ]; then
-		echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1, case2}" >&2
+		echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1, case2, ramp1}" >&2
 		return 1
 	fi
 
@@ -233,8 +320,52 @@ cpu_get_valid_freq ()
 				echo "600000"
 			fi
 			;;
+		"ramp1" )
+			# Ramp up/down from minimum to maximum, stopping at intermediate frequencies
+			# This ensures CPU jumps the least through the problematic range (1.4 & 1.75 GHz)
+			local FREQ_INDEX_NEXT="$(cpu_test_freqs_get_index $CPU_INDEX)" || return $?
+
+			# Double frequency count to use the same index for decreasing, too
+			local FREQ_INDEX_BOUNDS=$CPUFREQ_OPP_FREQS_COUNT
+			FREQ_INDEX_BOUNDS=$(((FREQ_INDEX_BOUNDS - 1)*2))
+
+			# Pick transition frequency from list, discarding too high/too low/repeat
+			local MIN_FREQ="$(cpu_get_min_allowed_clock $CPU_INDEX)" || return $?
+			local MAX_FREQ="$(cpu_get_max_allowed_clock $CPU_INDEX prior)" || return $?
+			local CURRENT_FREQ="$(cpu_get_max_allowed_clock $CPU_INDEX current)" || return $?
+			# Set initial value to out of range
+			local TRANS_FREQ="$((MAX_FREQ + 1))"
+			while [ $TRANS_FREQ -gt $MAX_FREQ ] \
+				|| [ $TRANS_FREQ -lt $MIN_FREQ ] \
+				|| [ $TRANS_FREQ -eq $CURRENT_FREQ ]; do
+				if [ $FREQ_INDEX_NEXT -ge $FREQ_INDEX_BOUNDS ]; then
+					# Wrap around to start
+					FREQ_INDEX_NEXT=0
+				fi
+
+				local REAL_INDEX=$FREQ_INDEX_NEXT
+				if [ $FREQ_INDEX_NEXT -ge $CPUFREQ_OPP_FREQS_COUNT ]; then
+					# > Decreasing
+					REAL_INDEX=$((FREQ_INDEX_BOUNDS-FREQ_INDEX_NEXT))
+				fi
+				# else - increasing, use value directly
+
+				# Shift from 0-index to 1-index
+				REAL_INDEX=$((REAL_INDEX+1))
+				TRANS_FREQ="$(echo $CPUFREQ_OPP_FREQS | cut -d ' ' -f $REAL_INDEX)"
+				#echo "FREQ_INDEX_NEXT = $FREQ_INDEX_NEXT, REAL_INDEX = $REAL_INDEX, TRANS_FREQ = $TRANS_FREQ" >&2
+
+				# Increment
+				FREQ_INDEX_NEXT=$((FREQ_INDEX_NEXT+1))
+			done
+
+			# Save index for next time
+			cpu_test_freqs_set_index "$CPU_INDEX" "$FREQ_INDEX_NEXT" || return $?
+
+			echo "$TRANS_FREQ"
+			;;
 		* )
-			echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1, case2}" >&2
+			echo "Usage: `basename $0` [cpu_get_valid_freq] {CPU index, or 'all'} {frequency mode: random, case1, case2, ramp1}" >&2
 			return 1
 			;;
 	esac
@@ -242,7 +373,7 @@ cpu_get_valid_freq ()
 
 print_usage_test_cycle_freqs ()
 {
-	echo "Usage: `basename $0` test_cycle_freqs {CPU index, cycling one while keeping other at max, or 'random', 'all'} {frequency mode: random, case1, case2}" >&2
+	echo "Usage: `basename $0` test_cycle_freqs {CPU index, cycling one while keeping other at max, or 'random', 'all'} {frequency mode: random, case1, case2, ramp1}" >&2
 }
 
 cpu_test_cycle_freqs ()
@@ -275,6 +406,14 @@ cpu_test_cycle_freqs ()
 
 	# Ensure defaults are reset if interrupted
 	trap cleanup_test SIGINT SIGTERM
+
+	# Create global variables
+	# Workaround for Bash subshell not propagating to parent shell
+	# See https://stackoverflow.com/questions/21632126/how-to-store-the-output-of-command-in-a-variable-without-creating-a-subshell-ba
+	CPU_TEST_FREQS_INDEX_0_FILE="$(mktemp)"
+	CPU_TEST_FREQS_INDEX_1_FILE="$(mktemp)"
+	# Initialize
+	cpu_test_freqs_set_index "all" 0
 
 	# Record start time
 	local TEST_START_SECS="$(date '+%s')"
@@ -350,6 +489,14 @@ cleanup_test ()
 	echo "$(log_datetime) Resetting CPUs to prior max allowed clock (CPU 0 = $CPU_MAX_CLOCK_0 KHz, CPU 1 = $CPU_MAX_CLOCK_1 KHz)..."
 	cpu_set_max_clock 0 "$CPU_MAX_CLOCK_0"
 	cpu_set_max_clock 1 "$CPU_MAX_CLOCK_1"
+
+	# Remove global variable files
+	if [ -n "$CPU_TEST_FREQS_INDEX_0_FILE" ] && [ -f "$CPU_TEST_FREQS_INDEX_0_FILE" ]; then
+		rm "$CPU_TEST_FREQS_INDEX_0_FILE"
+	fi
+	if [ -n "$CPU_TEST_FREQS_INDEX_1_FILE" ] && [ -f "$CPU_TEST_FREQS_INDEX_1_FILE" ]; then
+		rm "$CPU_TEST_FREQS_INDEX_1_FILE"
+	fi
 
 	echo "$(log_datetime) Cleaned up!"
 
