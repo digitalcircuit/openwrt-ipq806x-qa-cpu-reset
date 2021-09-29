@@ -476,6 +476,56 @@ cpu_test_cycle_freqs ()
 	return 1
 }
 
+cpu_test_fake_load ()
+{
+	# Ensure defaults are reset if interrupted
+	trap cleanup_test SIGINT SIGTERM
+
+	# Record start time
+	local TEST_START_SECS="$(date '+%s')"
+	# Record last statistic time
+	local TEST_LAST_PRINTED_SECS=0
+
+	while true; do
+		local TEST_DURATION="$(( $(date '+%s') - $TEST_START_SECS ))"
+		if [ "$TEST_DURATION" -lt 0 ]; then
+			echo "`basename $0` [cpu_test_fake_load] Time should not travel backwards!" >&2
+			echo "Start time in seconds since epoch: $TEST_START_SECS" >&2
+			echo "Calculated duration of test: $TEST_DURATION" >&2
+			echo "'date' program probably segfaulted?" >&2
+			break
+		fi
+
+		local LOAD_ACTIVE_DURATION="$(get_rand_number 1).$(get_rand_number 9)"
+		local LOAD_IDLE_DURATION="$(get_rand_number 1).$(get_rand_number 9)"
+
+		#if [ "$TEST_LAST_PRINTED_SECS" -lt "$TEST_DURATION" ]; then
+		#	TEST_LAST_PRINTED_SECS="$TEST_DURATION"
+		#	echo
+		#	echo "$(log_datetime) [${TEST_DURATION}s]"
+		#fi
+		# Verbose:
+		echo "$(log_datetime) [${TEST_DURATION}s] Running ${LOAD_ACTIVE_DURATION}s active, ${LOAD_IDLE_DURATION}s idle..."
+		## Brief:
+		#echo -n "#A={$NEXT_FREQ}KHz "
+
+		# Fake load
+		yes >/dev/null &
+		PID=$!
+		microsleep "$LOAD_ACTIVE_DURATION"
+		kill "$PID"
+		microsleep "$LOAD_IDLE_DURATION"
+	done
+
+	echo "[!] Something went wrong during the test, cleaning up..." >&2
+	CPU_TEST_FAILED=true
+
+	# Only reached if error occurs, normal cleanup is handled via signal "trap" above
+	cleanup_test
+
+	return 1
+}
+
 cleanup_test ()
 {
 	# Set all CPUs to default control
@@ -513,7 +563,7 @@ cleanup_test ()
 
 print_usage ()
 {
-	echo "Usage: `basename $0` {default, 1.4ghz, 1ghz, test_cycle_freqs}" >&2
+	echo "Usage: `basename $0` {default, 1.4ghz, 1ghz, pin_default, test_cycle_freqs, test_fake_load}" >&2
 	echo "Recommended settings - first set to 'default' or '1.4ghz' frequency, then run 'test_cycle_freqs random case1'" >&2
 	echo "Alternatively, first set to '1ghz' frequency, then run 'test_cycle_freqs random case2'" >&2
 }
@@ -551,6 +601,11 @@ case "$1" in
 		# Make sure OpenWRT startup customization is applied as well
 		/etc/init.d/cpufreq restart || return $?
 		;;
+	"pin_default" )
+		echo "Setting CPU governor to '$CPUFREQ_FORCED_GOVERNOR', forcing all CPUs clock to $CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK KHz"
+		cpu_set_governor "all" "$CPUFREQ_FORCED_GOVERNOR" || return $?
+		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK" || return $?
+		;;
 	"test_cycle_freqs" )
 		EXPECTED_ARGS=3
 		if [ $# -ne $EXPECTED_ARGS ]; then
@@ -560,6 +615,9 @@ case "$1" in
 		CPU_INDEX="$2"
 		FREQ_MODE="$3"
 		cpu_test_cycle_freqs "$CPU_INDEX" "$FREQ_MODE" || return $?
+		;;
+	"test_fake_load" )
+		cpu_test_fake_load || return $?
 		;;
 	* )
 		print_usage

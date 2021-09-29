@@ -8,8 +8,8 @@ _LOCAL_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 print_usage ()
 {
 	echo "Usage:" >&2
-	echo "  `basename $0` {CPU max frequency: default, 1.4ghz, 1ghz, unchanged}" >&2
-	echo "  {test mode: random, case1, case2, ramp1} {router hostname}" >&2
+	echo "  `basename $0` {CPU max frequency: default, 1.4ghz, 1ghz, pin_default, unchanged}" >&2
+	echo "  {test mode: random, case1, case2, ramp1, fake_load} {router hostname}" >&2
 	echo "  {optional: router SSH port, default=22} {optional: KDE Connect device name for notifications, default=disabled}" >&2
 	echo >&2
 	echo "Recommended settings:" >&2
@@ -56,7 +56,7 @@ fi
 
 # Validate settings
 case "$START_FREQ_MODE" in
-	"default" | "1.4ghz" | "1ghz" | "unchanged" )
+	"default" | "1.4ghz" | "1ghz" | "pin_default" | "unchanged" )
 		: # All good!
 		;;
 	* )
@@ -67,7 +67,7 @@ case "$START_FREQ_MODE" in
 esac
 
 case "$TEST_MODE" in
-	"random" | "case1" | "case2" | "ramp1" )
+	"random" | "case1" | "case2" | "ramp1" | "fake_load" )
 		: # All good!
 		;;
 	* )
@@ -159,7 +159,7 @@ fi
 setup_test_freqs ()
 {
 	case "$START_FREQ_MODE" in
-		"default" | "1.4ghz" | "1ghz" )
+		"default" | "1.4ghz" | "1ghz" | "pin_default" )
 			# Set system to known state
 			echo "$(date -R): Setting CPU max frequency..." | tee --append "$RUN_LOG"
 			ssh -p "$ROUTER_PORT" "root@$ROUTER_HOST" "/tmp/$RUN_SCRIPT" "$START_FREQ_MODE" 2>&1 | tee --append "$RUN_LOG"
@@ -193,6 +193,11 @@ while true; do
 			# Use tty (-t) to allow sending signals
 			# Results in a successful exit on Ctrl-C
 			ssh -o "ServerAliveInterval 3" -t -p "$ROUTER_PORT" "root@$ROUTER_HOST" "/tmp/$RUN_SCRIPT" test_cycle_freqs random $TEST_MODE 2>&1 | tee --append "$RUN_LOG"
+			;;
+		"fake_load" )
+			# Use tty (-t) to allow sending signals
+			# Results in a successful exit on Ctrl-C
+			ssh -o "ServerAliveInterval 3" -t -p "$ROUTER_PORT" "root@$ROUTER_HOST" "/tmp/$RUN_SCRIPT" test_fake_load 2>&1 | tee --append "$RUN_LOG"
 			;;
 		* )
 			echo "Unexpected TEST_MODE '$TEST_MODE'" >&2

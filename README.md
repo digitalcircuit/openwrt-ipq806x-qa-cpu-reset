@@ -66,6 +66,17 @@ You can continue to use the router like normal during the test, just be prepared
 
 *Connects as user `root` on SSH port `22` to the OpenWRT router at hostname `openwrt`, then runs the QA test with `1ghz` max CPU frequency (`1.0` GHz) while emulating the second set of crash conditions, `case2`.*
 
+#### Verify crash still happens with unchanging CPU frequency
+```
+./debug-cpufreq-ssh-loop.sh "pin_default" "fake_load" "openwrt"
+```
+
+*Connects as user `root` on SSH port `22` to the OpenWRT router at hostname `openwrt`, then runs the QA test with locking/pinning the CPU frequency to `1.75` GHz while repeatedly starting/stopping a fake load (`yes >/dev/null`).*
+
+**Update 2021-9-28:** This recreates the CPU crash even with the CPU frequencies pinned!
+
+This emulates the Déjà Dup bursty single-core CPU workload without needing to set up SFTP, Déjà Dup, etc.
+
 ## Usage on router directly
 
 ### Download to router
@@ -105,6 +116,7 @@ CPU frequency mode | Outcome
 `default`          | Sets max CPU frequency to `1.75` GHz (default)
 `1.4ghz`           | Sets max CPU frequency to `1.4` GHz (temporary workaround for issue)
 `1ghz`             | Sets max CPU frequency to `1.0` GHz (`IPQ8064` limit for `1.0` GHz L2 cache)
+`pin_default`      | Locks CPU frequency to `1.75` GHz (`performance` governor)
 `unchanged`        | No change, uses current per-CPU `[…]/policy*/scaling_max_freq` as upper limit
 
 All options other than `unchanged` adjusts `scaling_max_freq` for all CPUs, e.g. `/sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq`.
@@ -119,12 +131,13 @@ Initial results suggest focusing on CPU frequency transitions that are near the 
 
 ### Test modes
 
-Test mode | Outcome
-----------|---------
-`random`  | Randomizes CPU frequency between `scaling_min_freq` and `scaling_max_freq`
-`case1`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `800` MHz
-`case2`   | Cycles CPU frequency between maximum (`scaling_max_freq`) and `600` MHz (greater jump)
-`ramp1`   | Smoothly ramps CPU frequency between `scaling_min_freq` and `scaling_max_freq`
+Test mode   | Outcome
+------------|---------
+`random`    | Randomizes CPU frequency between `scaling_min_freq` and `scaling_max_freq`
+`case1`     | Cycles CPU frequency between maximum (`scaling_max_freq`) and `800` MHz
+`case2`     | Cycles CPU frequency between maximum (`scaling_max_freq`) and `600` MHz (greater jump)
+`ramp1`     | Smoothly ramps CPU frequency between `scaling_min_freq` and `scaling_max_freq`
+`fake_load` | Runs a single core load at random duty cycle for `0` to `4` seconds
 
 ### Advanced: CPU index
 
