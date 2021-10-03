@@ -264,9 +264,10 @@ Ansuel had [some initial suggestions on GitHub over here](https://github.com/ope
 
 Result | Mitigation | Outcome
 -------|------------|--------
-?     | Add transition frequencies (e.g. `1.75` → `1.4` → `1.0` GHz) | *Not yet tested*
-?     | Force both cores to same frequency (always, or at `1.4` & `1.75` GHz) | *Not yet tested*
-?     | Increase clock latency (all, or just `1.4` & `1.75` GHz) | *Not yet tested*
+? *unknown* | Add transition frequencies (e.g. `1.75` → `1.4` → `1.0` GHz) | *[Help needed to verify](https://lists.openwrt.org/pipermail/openwrt-devel/2021-September/036287.html )*
+? *unknown* | Force both cores to same frequency (always, or at `1.4` & `1.75` GHz) | *[Help needed to verify](https://lists.openwrt.org/pipermail/openwrt-devel/2021-September/036287.html )*
+X **fail** | Increase clock latency (all, or just `1.4` & `1.75` GHz) | *[No noticeable impact](https://lists.openwrt.org/pipermail/openwrt-devel/2021-September/036287.html )*
+! *pending* | [Pin L2 cache frequency to maximum](https://lists.openwrt.org/pipermail/openwrt-devel/2021-September/036289.html ) | *Not yet tested*
 
 ## Links
 
