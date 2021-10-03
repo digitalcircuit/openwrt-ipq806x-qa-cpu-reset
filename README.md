@@ -149,6 +149,42 @@ CPU index | Outcome
 
 ## Notes / FAQ
 
+### How to workaround this issue?
+
+So far, limiting both CPUs maximum clock frequency to 1.0 GHz seems to stop all crashes.
+
+Though not required, to simplify this, you can use the `cpu-crash-workaround.sh` script.
+
+**NOTE:** This will reduce performance!  It's only a workaround, *not* a fix.  I created this to help ensure my two NBG6817 routers are stable in between testing (one is at a remote location).
+
+#### Install service to limit CPU to 1.0 GHz
+
+```
+# Download
+#
+# (You might need to transfer the file to your router in a different way)
+wget https://raw.githubusercontent.com/digitalcircuit/openwrt-ipq806x-qa-cpu-reset/main/cpu-crash-workaround.sh
+
+# Mark script as executable
+chmod u+x cpu-crash-workaround.sh
+
+# Install
+./cpu-crash-workaround.sh install
+```
+
+This automatically persists across sysupgrades by adding itself to the backup list, *including* backing up the fact that it's enabled.
+
+The service will not modify the CPU max clock frequency if the CPU governor is not set to `ondemand`.
+
+#### Removing service that limits CPU to 1.0 GHz
+
+If the script is no longer available (e.g. rebooted), you'll need to re-download it as per the install instructions.
+
+```
+# Remove
+./cpu-crash-workaround.sh remove
+```
+
 ### Why guard against `date` segfaulting?
 
 Occasionally, this QA script results in `date` itself segfaulting when getting current time since the Unix epoch in seconds.  If connected through Mosh, sometimes Mosh will segfault instead.
