@@ -177,6 +177,37 @@ setup_test_freqs ()
 # Set system to known state if enabled
 setup_test_freqs
 
+reset_test_freqs ()
+{
+	case "$START_FREQ_MODE" in
+		"unchanged" )
+			# Don't change the frequencies at all
+			:
+			;;
+		* )
+			echo "$(date -R): Attempting to reset CPU frequency settings..." | tee --append "$RUN_LOG"
+			# Don't exit on failure
+			set +e
+			# Attempt to restore default configuration
+			ssh -o "ServerAliveInterval 3" -t -p "$ROUTER_PORT" "root@$ROUTER_HOST" "/tmp/$RUN_SCRIPT" reset 2>&1 | tee --append "$RUN_LOG"
+			EXIT_STATUS=$?
+			# Resume exit on failure
+			set -e
+			# Determine exit result
+			if [ "$EXIT_STATUS" -eq 0 ]; then
+				return 0
+			elif [ "$EXIT_STATUS" -eq 255 ]; then
+				echo "$(date -R): SSH encountered problem while resetting CPU frequency settings after test, may need manually restored" 2>&1 | tee --append "$RUN_LOG"
+				echo "$(date -R): (If the router rebooted during testing, this is expected and nothing needs done)" 2>&1 | tee --append "$RUN_LOG"
+				return 1
+			else
+				echo "$(date -R): Couldn't reset CPU frequency settings after test, may need manually restored" 2>&1 | tee --append "$RUN_LOG"
+				return 1
+			fi
+			;;
+	esac
+}
+
 # Test forever!  Or at least a very long time...
 while true; do
 	if ! ssh -o "ServerAliveInterval 3" -p "$ROUTER_PORT" "root@$ROUTER_HOST" echo "success" >/dev/null; then
@@ -240,6 +271,12 @@ while true; do
 	# Ping local console
 	echo -n -e '\a'
 done
+
+# Attempt to clean up, but continue even if there are errors
+reset_test_freqs || true
+
+echo "$(date -R): Testing concluded." 2>&1 | tee --append "$RUN_LOG"
+echo 2>&1 | tee --append "$RUN_LOG"
 
 echo "$EMJ_STOP Stopped $DESCRIPTION due to $STOP_REASON."$'\n'"[$COUNT_SUCCESS $EMJ_CHECK / $COUNT_FAILURE $EMJ_X of $COUNT_TOTAL $EMJ_FLAG]" 2>&1 | tee --append "$RUN_LOG"
 kde_connect_msg "$EMJ_STOP Stopped $DESCRIPTION due to $STOP_REASON."$'\n'"[$COUNT_SUCCESS $EMJ_CHECK / $COUNT_FAILURE $EMJ_X of $COUNT_TOTAL $EMJ_FLAG]" || true # Don't exit on failure

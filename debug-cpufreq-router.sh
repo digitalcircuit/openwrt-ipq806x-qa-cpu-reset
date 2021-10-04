@@ -561,9 +561,18 @@ cleanup_test ()
 	fi
 }
 
+reapply_openwrt_cpufreq_service ()
+{
+	# Restore OpenWRT startup customization
+	if [ -x "/etc/init.d/cpufreq" ] && /etc/init.d/cpufreq enabled; then
+		echo "$(log_datetime) Re-applying OpenWRT CPU customization..."
+		/etc/init.d/cpufreq restart || return $?
+	fi
+}
+
 print_usage ()
 {
-	echo "Usage: `basename $0` {default, 1.4ghz, 1ghz, pin_default, test_cycle_freqs, test_fake_load}" >&2
+	echo "Usage: `basename $0` {reset, default, 1.4ghz, 1ghz, pin_default, test_cycle_freqs, test_fake_load}" >&2
 	echo "Recommended settings - first set to 'default' or '1.4ghz' frequency, then run 'test_cycle_freqs random case1'" >&2
 	echo "Alternatively, first set to '1ghz' frequency, then run 'test_cycle_freqs random case2'" >&2
 }
@@ -580,29 +589,36 @@ CPU_PRIOR_MAX_CLOCK_1="$(cpu_get_max_allowed_clock 1 current)" || exit $?
 
 # Option
 case "$1" in
+	"reset" )
+		# Re-apply default CPU settings with OpenWRT service
+		"$0" "default"
+		# Restore CPU crash workaround if applied
+		if [ -x "/etc/init.d/cpu_crash_workaround" ] && /etc/init.d/cpu_crash_workaround enabled; then
+			echo "$(log_datetime) Re-applying CPU crash workaround..."
+			/etc/init.d/cpu_crash_workaround restart || return $?
+		fi
+		echo "$(log_datetime) Default CPU frequency policy restored!"
+		;;
 	"default" )
-		echo "Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK KHz"
+		echo "$(log_datetime) Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK KHz"
 		cpu_set_governor "all" "$CPUFREQ_DEFAULT_GOVERNOR" || return $?
 		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK" || return $?
-		# Make sure OpenWRT startup customization is applied as well
-		/etc/init.d/cpufreq restart || return $?
+		reapply_openwrt_cpufreq_service
 		;;
 	"1.4ghz" )
-		echo "Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK KHz"
+		echo "$(log_datetime) Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK KHz"
 		cpu_set_governor "all" "$CPUFREQ_DEFAULT_GOVERNOR" || return $?
 		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_1_4GHZ_MAX_CLOCK" || return $?
-		# Make sure OpenWRT startup customization is applied as well
-		/etc/init.d/cpufreq restart || return $?
+		reapply_openwrt_cpufreq_service
 		;;
 	"1ghz" )
-		echo "Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_1GHZ_MAX_CLOCK KHz"
+		echo "$(log_datetime) Setting CPU governor to '$CPUFREQ_DEFAULT_GOVERNOR', all CPUs max allowed clock to $CPUFREQ_IPQ8065_1GHZ_MAX_CLOCK KHz"
 		cpu_set_governor "all" "$CPUFREQ_DEFAULT_GOVERNOR" || return $?
 		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_1GHZ_MAX_CLOCK" || return $?
-		# Make sure OpenWRT startup customization is applied as well
-		/etc/init.d/cpufreq restart || return $?
+		reapply_openwrt_cpufreq_service
 		;;
 	"pin_default" )
-		echo "Setting CPU governor to '$CPUFREQ_FORCED_GOVERNOR', forcing all CPUs clock to $CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK KHz"
+		echo "$(log_datetime) Setting CPU governor to '$CPUFREQ_FORCED_GOVERNOR', forcing all CPUs clock to $CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK KHz"
 		cpu_set_governor "all" "$CPUFREQ_FORCED_GOVERNOR" || return $?
 		cpu_set_max_clock "all" "$CPUFREQ_IPQ8065_DEFAULT_MAX_CLOCK" || return $?
 		;;
